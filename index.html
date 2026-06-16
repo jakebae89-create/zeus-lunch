@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>제우스의 점심 ⚡ 번개로 식당 고르기</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="theme-color" content="#1a1342" />
+<meta name="description" content="번개로 주변 식당을 골라주는 앱" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="제우스의 점심" />
+<link rel="apple-touch-icon" href="apple-touch-icon-180.png" />
+<style>
+  :root {
+    --sky-top: #05030f;
+    --sky-mid: #1a1342;
+    --sky-bot: #2c1c63;
+    --bolt: #fdf6a8;
+    --accent: #ffd34e;
+    --ink: #f5f3ff;
+    --muted: #b9b4d6;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body {
+    font-family: "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(90% 55% at 50% 120%, rgba(78,62,190,.5) 0%, transparent 62%),
+      radial-gradient(60% 42% at 22% 14%, rgba(104,60,200,.5) 0%, transparent 62%),
+      radial-gradient(70% 44% at 82% 22%, rgba(62,84,210,.45) 0%, transparent 62%),
+      radial-gradient(120% 70% at 50% -12%, rgba(22,10,56,.92) 0%, transparent 58%),
+      linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 52%, var(--sky-bot) 100%);
+    -webkit-user-select: none; user-select: none;
+    touch-action: none;
+  }
+
+  /* ===== 무대 ===== */
+  #stage {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+  }
+
+  /* 상단 충전 영역 (구름 제거됨) */
+  #cloudband {
+    position: relative; height: 120px; flex: none;
+  }
+
+  /* 놀이판 (식당 아이콘 배치 영역) */
+  #field { position: relative; flex: 1; }
+
+  /* 배경 앰비언트 번개 캔버스 (아이콘 뒤, 하늘에서 번쩍) */
+  #bg { position: fixed; inset: 0; z-index: -2; pointer-events: none; }
+  /* 하단 먹구름 실루엣 */
+  #clouds {
+    position: fixed; left: -8%; right: -8%; bottom: -3%; height: 36vh;
+    z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(58% 90% at 18% 100%, #120a30 0%, rgba(18,10,48,.5) 42%, transparent 72%),
+      radial-gradient(64% 95% at 50% 100%, #19103f 0%, rgba(25,16,63,.5) 44%, transparent 74%),
+      radial-gradient(58% 88% at 82% 100%, #0e0828 0%, rgba(14,8,40,.5) 42%, transparent 72%);
+    filter: blur(7px);
+  }
+
+  /* 번개 캔버스 (전체 화면 오버레이) */
+  #fx { position: fixed; inset: 0; pointer-events: none; z-index: 40; }
+
+  /* 화면 번쩍임 */
+  #flash {
+    position: fixed; inset: 0; background: #fff; opacity: 0;
+    pointer-events: none; z-index: 39; transition: opacity .08s;
+  }
+
+  /* 충전 중 폭풍 연출: 충전(--charge 0..1)이 셀수록 하늘이 어두워지고
+     상단에서 전운이 몰려드는 비네팅 + 푸른 섬광 기운 */
+  #storm {
+    position: fixed; inset: 0; z-index: 38; pointer-events: none; opacity: 0;
+    transition: opacity .14s linear;
+    background:
+      radial-gradient(140% 60% at 50% -10%,
+        rgba(90,150,255,calc(.18 * var(--charge,0))) 0%, transparent 55%),
+      radial-gradient(120% 95% at 50% 42%,
+        transparent 26%, rgba(2,5,14,calc(.72 * var(--charge,0))) 100%);
+  }
+  body.charging #storm { opacity: 1; }
+  /* 퍼펙트 존(85%+) 진입 시 화면 가장자리가 옅게 맥동 */
+  body.charging.perfect #storm { animation: stormpulse .5s ease-in-out infinite; }
+  @keyframes stormpulse { 50% { filter: brightness(1.35); } }
+
+  /* ===== 식당 아이콘 ===== */
+  .resto {
+    position: absolute; transform: translate(-50%, -50%);
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    transition: transform .25s ease, filter .25s ease, opacity .4s ease;
+    opacity: 0; animation: pop .35s ease forwards;
+  }
+  @keyframes pop {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(.2); }
+    100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  }
+  .resto .ic {
+    position: relative;
+    font-size: 44px; line-height: 1;
+    filter: drop-shadow(0 3px 8px rgba(0,0,0,.55));
+  }
+  /* 아이콘 뒤 은은한 글로우 원판 */
+  .resto .ic::before {
+    content: ""; position: absolute; left: 50%; top: 50%; z-index: -1;
+    width: 78px; height: 78px; transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(77,184,255,.33) 0%, rgba(77,184,255,.08) 46%, transparent 70%);
+    transition: width .25s, height .25s, background .25s;
+  }
+  .resto .nm {
+    font-size: 11.5px; font-weight: 700; color: #dfe9ff;
+    background: rgba(10,20,42,.7); padding: 3px 10px; border-radius: 999px;
+    white-space: nowrap; backdrop-filter: blur(3px);
+    border: 1px solid rgba(120,180,255,.2);
+    box-shadow: 0 2px 8px rgba(0,0,0,.35);
+  }
+  .resto.dim { opacity: .22; filter: grayscale(.65); }
+  .resto.dim .ic::before { background: none; }
+  .resto.winner { z-index: 45; }
+  .resto.winner .ic {
+    animation: zap 1.4s ease;
+    filter: drop-shadow(0 0 16px #aee3ff) drop-shadow(0 0 34px #4db8ff);
+  }
+  .resto.winner .ic::before {
+    width: 100px; height: 100px;
+    background: radial-gradient(circle, rgba(140,215,255,.6) 0%, rgba(77,184,255,.28) 50%, transparent 72%);
+  }
+  .resto.winner .nm {
+    color: #04122c; background: linear-gradient(180deg, #bfe6ff, #4db8ff);
+    font-weight: 800; border-color: #9fd6ff;
+  }
+  @keyframes zap {
+    0% { transform: scale(1); }
+    15% { transform: scale(1.9) rotate(-6deg); }
+    35% { transform: scale(1.4) rotate(5deg); }
+    100% { transform: scale(1.5) rotate(0); }
+  }
+
+  /* ===== UI 오버레이 ===== */
+  #ui {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+    padding: 16px 18px calc(20px + env(safe-area-inset-bottom));
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+    pointer-events: none;
+  }
+  #hint {
+    font-size: .95rem; color: var(--muted); text-align: center;
+    min-height: 1.3em; text-shadow: 0 1px 3px rgba(0,0,0,.5);
+  }
+  #title {
+    position: fixed; top: calc(14px + env(safe-area-inset-top)); left: 0; right: 0;
+    text-align: center; z-index: 50; pointer-events: none;
+  }
+  #title h1 { margin: 0; font-size: 1.15rem; letter-spacing: .5px; text-shadow: 0 2px 8px rgba(0,0,0,.6); }
+  #title p { margin: 2px 0 0; font-size: .75rem; color: var(--muted); }
+
+  /* 카테고리 칩 바 */
+  #cats {
+    position: fixed; top: calc(64px + env(safe-area-inset-top)); left: 0; right: 0;
+    z-index: 50; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+    padding: 0 12px; pointer-events: none;
+  }
+  #cats .chip {
+    pointer-events: auto; font-family: inherit; font-size: .82rem; font-weight: 700;
+    padding: 7px 14px; border-radius: 999px; cursor: pointer;
+    background: rgba(255,255,255,.08); color: var(--muted);
+    border: 1.5px solid rgba(255,255,255,.16); backdrop-filter: blur(4px);
+    transition: background .15s, color .15s, border-color .15s, transform .05s;
+  }
+  #cats .chip:active { transform: scale(.94); }
+  #cats .chip.active {
+    background: var(--accent); color: #1a1730; border-color: var(--accent);
+    box-shadow: 0 4px 14px rgba(255,211,78,.35);
+  }
+
+  .btn {
+    pointer-events: auto;
+    padding: 15px 30px; font-size: 1.05rem; font-weight: 800; font-family: inherit;
+    color: #1a1730; background: linear-gradient(180deg, #ffe27a, var(--accent));
+    border: none; border-radius: 16px; cursor: pointer;
+    box-shadow: 0 8px 24px rgba(255,211,78,.35), inset 0 1px 0 rgba(255,255,255,.6);
+    transition: transform .06s, box-shadow .2s, opacity .2s;
+  }
+  .btn:active { transform: scale(.96); }
+  .btn.ghost {
+    background: rgba(255,255,255,.1); color: var(--ink);
+    box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.25);
+    font-size: .9rem; padding: 11px 20px;
+  }
+  .hidden { display: none !important; }
+
+  /* 충전 게이지 */
+  #gauge {
+    position: fixed; left: 50%; bottom: 150px; transform: translateX(-50%);
+    z-index: 48; width: min(280px, 76vw); text-align: center; pointer-events: none;
+  }
+  #gauge .gtrack {
+    position: relative; height: 18px; border-radius: 999px;
+    background: rgba(10,8,24,.7); overflow: hidden;
+    box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.18);
+  }
+  #gauge .gfill {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 0%;
+    background: linear-gradient(90deg, #4da3ff, #ffe27a 60%, #ff5a3c);
+    transition: width .05s linear;
+  }
+  /* 퍼펙트 존 (85~100%) */
+  #gauge .gperfect {
+    position: absolute; top: 0; bottom: 0; left: 85%; right: 0;
+    background: repeating-linear-gradient(45deg, rgba(255,255,255,.25) 0 4px, transparent 4px 8px);
+    border-left: 2px solid rgba(255,255,255,.6); z-index: 1;
+  }
+  #gauge .glabel {
+    margin-top: 8px; font-size: .95rem; font-weight: 800; letter-spacing: .5px;
+    text-shadow: 0 2px 6px rgba(0,0,0,.6);
+  }
+  #gauge.over .gfill { animation: overpulse .18s linear infinite; }
+  #gauge.over .glabel { color: #ff5a3c; }
+  @keyframes overpulse { 50% { filter: brightness(1.8); } }
+
+  /* 검색 로딩 */
+  #loader { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .spinner {
+    width: 46px; height: 46px; border-radius: 50%;
+    border: 4px solid rgba(255,255,255,.15); border-top-color: var(--accent);
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* 결과 모달 (중앙) */
+  #resultWrap {
+    position: fixed; inset: 0; z-index: 60;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  #resultWrap .backdrop {
+    position: absolute; inset: 0; background: rgba(8,6,20,.6);
+    backdrop-filter: blur(3px);
+  }
+  #result {
+    position: relative;
+    background: rgba(28,24,52,.96); backdrop-filter: blur(8px);
+    border: 1.5px solid rgba(255,211,78,.4);
+    border-radius: 22px; padding: 22px 24px; text-align: center;
+    box-shadow: 0 16px 50px rgba(0,0,0,.55); max-width: 360px; width: 100%;
+    max-height: 84vh; overflow-y: auto;
+    animation: rise .35s ease;
+  }
+  @keyframes rise { from { transform: translateY(16px) scale(.96); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+  #result .big { font-size: 1.6rem; font-weight: 900; color: var(--accent); }
+  #result .big .ic { font-size: 1.6rem; }
+  #result .meta { margin-top: 6px; font-size: .85rem; color: var(--muted); }
+  #result .menu-title {
+    text-align: left; font-size: .78rem; font-weight: 700; color: var(--muted);
+    margin: 18px 0 4px; letter-spacing: .3px;
+  }
+  #result ul.menu {
+    list-style: none; margin: 0; padding: 8px 0 0;
+    border-top: 1px solid rgba(255,255,255,.12); text-align: left;
+  }
+  #result ul.menu li {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 14px;
+    padding: 7px 2px; border-bottom: 1px dashed rgba(255,255,255,.08);
+  }
+  #result ul.menu li:last-child { border-bottom: none; }
+  #result ul.menu li .mn { color: var(--ink); font-weight: 600; font-size: .95rem; }
+  #result ul.menu li .mp { color: var(--accent); font-weight: 800; white-space: nowrap; font-size: .95rem; }
+  #result .row { display: flex; gap: 10px; margin-top: 18px; }
+  #result .row .btn { flex: 1; }
+  /* 결과 모달: 카카오맵 링크 (실데이터일 때) */
+  #result .place-extra { margin-top: 16px; }
+  #result .placelink {
+    display: inline-block; font-size: .9rem; font-weight: 800; text-decoration: none;
+    color: #04122c; background: linear-gradient(180deg, #bfe6ff, #4db8ff);
+    padding: 10px 18px; border-radius: 12px;
+  }
+
+  /* ===== API 키 버튼 + 모달 ===== */
+  #keyBtn {
+    position: fixed; top: calc(14px + env(safe-area-inset-top)); right: 14px; z-index: 55;
+    width: 40px; height: 40px; border-radius: 12px; cursor: pointer;
+    font-size: 1.1rem; line-height: 1; pointer-events: auto;
+    background: rgba(255,255,255,.08); color: var(--ink);
+    border: 1.5px solid rgba(255,255,255,.18); backdrop-filter: blur(4px);
+    transition: transform .06s, background .15s;
+  }
+  #keyBtn:active { transform: scale(.92); }
+
+  #keyWrap {
+    position: fixed; inset: 0; z-index: 70;
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+  }
+  #keyWrap .backdrop {
+    position: absolute; inset: 0; background: rgba(8,6,20,.62); backdrop-filter: blur(3px);
+  }
+  #keyBox {
+    position: relative; width: 100%; max-width: 360px;
+    background: rgba(28,24,52,.97); backdrop-filter: blur(8px);
+    border: 1.5px solid rgba(150,120,255,.4); border-radius: 22px;
+    padding: 22px 22px 18px; box-shadow: 0 16px 50px rgba(0,0,0,.55);
+    animation: rise .3s ease;
+  }
+  #keyBox .kb-title { font-size: 1.15rem; font-weight: 900; color: var(--accent); }
+  #keyBox .kb-desc { font-size: .8rem; color: var(--muted); line-height: 1.55; margin: 10px 0 14px; }
+  #keyBox .kb-desc b { color: #cfc4ff; }
+  #keyInput {
+    width: 100%; font-family: inherit; font-size: .95rem;
+    padding: 12px 14px; border-radius: 12px; color: var(--ink);
+    background: rgba(10,8,24,.7); border: 1.5px solid rgba(255,255,255,.2); outline: none;
+  }
+  #keyInput:focus { border-color: var(--accent); }
+  #keyBox .kb-row { margin-top: 12px; }
+  #keyBox .kb-row .btn { width: 100%; }
+  #keyBox .kb-links {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    margin-top: 14px; font-size: .8rem;
+  }
+  #keyBox .kb-links a { color: #9fd0ff; text-decoration: none; font-weight: 700; }
+  #keyBox .kb-skip {
+    background: none; border: none; color: var(--muted); font-family: inherit;
+    font-size: .8rem; cursor: pointer; text-decoration: underline; padding: 0;
+  }
+</style>
+</head>
+<body>
+  <canvas id="bg"></canvas>
+  <div id="clouds"></div>
+
+  <div id="title">
+    <h1>⚡ 제우스의 점심</h1>
+    <p>주변 식당을 모아 번개로 골라드립니다</p>
+  </div>
+
+  <button id="keyBtn" title="카카오 API 키 설정">🔑</button>
+
+  <div id="cats"></div>
+
+  <div id="stage">
+    <div id="cloudband"></div>
+    <div id="field"></div>
+  </div>
+
+  <div id="storm"></div>
+  <div id="flash"></div>
+  <canvas id="fx"></canvas>
+
+  <!-- 충전 게이지 -->
+  <div id="gauge" class="hidden">
+    <div class="gtrack">
+      <div class="gperfect"></div>
+      <div class="gfill"></div>
+    </div>
+    <div class="glabel"><span id="gpct">0</span>% ⚡</div>
+  </div>
+
+  <div id="ui">
+    <div id="hint"></div>
+
+    <!-- 시작 화면 -->
+    <button class="btn" id="searchBtn">📡 주변 식당 검색하기</button>
+
+    <!-- 로딩 -->
+    <div id="loader" class="hidden">
+      <div class="spinner"></div>
+      <div style="font-size:.9rem;color:var(--muted)">주변 식당을 찾는 중…</div>
+    </div>
+
+  </div>
+
+  <!-- 카카오 API 키 입력 모달 -->
+  <div id="keyWrap" class="hidden">
+    <div class="backdrop"></div>
+    <div id="keyBox">
+      <div class="kb-title">🔑 카카오 JavaScript 키</div>
+      <p class="kb-desc">
+        실제 내 주변 식당을 불러오려면 카카오맵 <b>JavaScript 키</b>가 필요합니다.
+        키는 이 브라우저(localStorage)에만 저장되며 외부로 전송되지 않습니다.<br>
+        ※ 카카오 개발자센터에서 <b>플랫폼 → Web</b>에 이 사이트 도메인을 등록해야 동작합니다.
+      </p>
+      <input id="keyInput" type="text" placeholder="여기에 JavaScript 키 붙여넣기" autocomplete="off" spellcheck="false" />
+      <div class="kb-row">
+        <button class="btn" id="keySave">저장하고 검색</button>
+      </div>
+      <div class="kb-links">
+        <a href="https://developers.kakao.com" target="_blank" rel="noopener">키 발급받기 ↗</a>
+        <button id="keySkip" class="kb-skip">키 없이 둘러보기(더미)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 결과 (중앙 모달) -->
+  <div id="resultWrap" class="hidden">
+    <div class="backdrop"></div>
+    <div id="result">
+      <div class="big"><span class="ic"></span> <span class="rname"></span></div>
+      <div class="meta"></div>
+      <div class="menu-title">📋 대표 메뉴</div>
+      <ul class="menu"></ul>
+      <div class="place-extra hidden">
+        <a class="placelink" target="_blank" rel="noopener">🗺️ 카카오맵에서 보기 ↗</a>
+      </div>
+      <div class="row">
+        <button class="btn ghost" id="againBtn">⚡ 다시 번개</button>
+        <button class="btn ghost" id="researchBtn">📡 재검색</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ============================================================
+   제우스의 점심 — 번개로 식당 고르기 (프로토타입)
+   * 현재는 더미 데이터. 나중에 이 부분만 실제 위치/장소 API로 교체.
+   ============================================================ */
+
+// ---- 더미 식당 데이터 (실제 API 응답을 흉내) ----
+const DUMMY_POOL = [
+  { name: "김치찌개집",   cat: "한식",   ic: "🍲", menu: [["김치찌개",8000],["제육볶음",9000],["된장찌개",7500],["공기밥",1000]] },
+  { name: "마라탕 천국",  cat: "중식",   ic: "🌶️", menu: [["마라탕(중)",11000],["마라샹궈",15000],["꿔바로우",13000],["콜라",2000]] },
+  { name: "스시 오마카세", cat: "일식",   ic: "🍣", menu: [["점심 오마카세",35000],["모둠초밥",22000],["연어덮밥",13000]] },
+  { name: "파스타 공방",  cat: "양식",   ic: "🍝", menu: [["까르보나라",13000],["토마토 파스타",12000],["마르게리타 피자",16000]] },
+  { name: "분식나라",     cat: "분식",   ic: "🍢", menu: [["떡볶이",4000],["순대",4500],["김밥",3500],["모둠튀김",4000]] },
+  { name: "쌀국수 본점",  cat: "아시안", ic: "🍜", menu: [["양지쌀국수",9500],["분짜",11000],["짜조",6000]] },
+  { name: "치킨파라다이스",cat: "치킨",   ic: "🍗", menu: [["후라이드",18000],["양념치킨",19000],["반반",19000],["생맥주",4000]] },
+  { name: "버거 스테이션", cat: "양식",   ic: "🍔", menu: [["치즈버거",7500],["베이컨버거",9500],["감자튀김",3500]] },
+  { name: "초밥뷔페",     cat: "일식",   ic: "🍱", menu: [["점심 뷔페",19900],["저녁 뷔페",25900],["음료바",0]] },
+  { name: "왕만두집",     cat: "중식",   ic: "🥟", menu: [["고기만두",6000],["김치만두",6000],["만둣국",8000]] },
+  { name: "피자 오븐",    cat: "양식",   ic: "🍕", menu: [["페퍼로니 L",21000],["고르곤졸라 L",23000],["콤비네이션 L",22000]] },
+  { name: "국밥1번지",    cat: "한식",   ic: "🥘", menu: [["돼지국밥",9000],["순대국밥",9000],["수육",18000]] },
+  { name: "타코 아미고",  cat: "멕시칸", ic: "🌮", menu: [["타코 3pcs",12000],["부리또",11000],["나초",8000]] },
+  { name: "라멘 야시장",  cat: "일식",   ic: "🍥", menu: [["돈코츠라멘",10000],["차슈라멘",13000],["교자",5000]] },
+  { name: "샐러드볼",     cat: "샐러드", ic: "🥗", menu: [["닭가슴살 샐러드",9900],["연어 포케",12900],["아보카도볼",11900]] },
+  { name: "할매 백반",    cat: "한식",   ic: "🍚", menu: [["제육백반",8000],["고등어구이",9000],["청국장",7500]] },
+  { name: "전주 비빔밥",   cat: "한식",   ic: "🍛", menu: [["전주비빔밥",9000],["돌솥비빔밥",9500],["육회비빔밥",13000]] },
+  { name: "김밥나라",     cat: "분식",   ic: "🍙", menu: [["참치김밥",3500],["라면",3500],["돈가스",6500]] },
+  { name: "라볶이 명가",   cat: "분식",   ic: "🍜", menu: [["라볶이",5000],["치즈떡볶이",5500],["튀김만두",4000]] },
+  { name: "별다방 카페",   cat: "카페",   ic: "☕", menu: [["아메리카노",4500],["카페라떼",5000],["바닐라라떼",5500],["치즈케이크",6500]] },
+  { name: "디저트 38",    cat: "카페",   ic: "🍰", menu: [["딸기 생크림케이크",7000],["크로플",6000],["아인슈페너",6000]] },
+  { name: "베이글 브런치", cat: "카페",   ic: "🥯", menu: [["플레인 베이글",3500],["베이글 샌드위치",7500],["콜드브루",5000]] },
+  { name: "편의점 도시락", cat: "편의점", ic: "🏪", menu: [["제육 도시락",4500],["불고기 도시락",4900],["삼각김밥",1300],["컵라면",1500]] },
+];
+
+const STATE = { IDLE:"idle", SEARCHING:"searching", READY:"ready", STRIKING:"striking", RESULT:"result" };
+let state = STATE.IDLE;
+let restos = [];      // {el, x, y, data}
+let POOL = DUMMY_POOL; // 현재 추첨 풀 (더미 또는 카카오 실데이터)
+let usingReal = false; // 카카오 실데이터 사용 중 여부
+
+// 충전 상태
+const CHARGE_MS = 1300;   // 0→100% 도달 시간
+const OVER_MS   = 700;    // 100% 이후 과충전(폭발)까지 여유
+let charging = false;
+let chargeStart = 0;
+let chargeLevel = 0;      // 0..1
+let chargeRAF = null;
+let overcharged = false;
+
+const $ = s => document.querySelector(s);
+const field   = $("#field");
+const hint     = $("#hint");
+const searchBtn= $("#searchBtn");
+const loader   = $("#loader");
+const result   = $("#resultWrap");
+const flash     = $("#flash");
+const cloudband = $("#cloudband");
+const gauge     = $("#gauge");
+const gfill     = gauge.querySelector(".gfill");
+const gpct      = $("#gpct");
+
+// ---- 햅틱 (지원 기기에서만) ----
+function buzz(pattern) {
+  if (navigator.vibrate) navigator.vibrate(pattern);
+}
+
+// ---- 캔버스 셋업 (고해상도 대응) ----
+const fx = $("#fx");
+const fxc = fx.getContext("2d");
+function sizeCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  fx.width = innerWidth * dpr;
+  fx.height = innerHeight * dpr;
+  fx.style.width = innerWidth + "px";
+  fx.style.height = innerHeight + "px";
+  fxc.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+sizeCanvas();
+addEventListener("resize", () => { sizeCanvas(); });
+
+/* ============================================================
+   배경 앰비언트 번개 (Ride the Lightning 무드)
+   - 아이콘 뒤(#bg 캔버스)에서 하늘이 수시로 번쩍이며 보랏빛 번개가 내리침
+   - 게임 번개(#fx)와 분리. 발사 중(STRIKING)엔 새로 생성하지 않음
+   ============================================================ */
+const bg  = $("#bg");
+const bgc = bg.getContext("2d");
+function sizeBg() {
+  const dpr = window.devicePixelRatio || 1;
+  bg.width = innerWidth * dpr; bg.height = innerHeight * dpr;
+  bg.style.width = innerWidth + "px"; bg.style.height = innerHeight + "px";
+  bgc.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+sizeBg();
+addEventListener("resize", sizeBg);
+
+let ambBolts = [];   // { pts, branches, born, dur }
+function spawnAmbBolt() {
+  const W = innerWidth, H = innerHeight;
+  // 화면을 좌우로 감싸듯 가장자리 쪽에서 잘 내리침 (앨범 커버 느낌)
+  const x = Math.random() < 0.5
+    ? W * (0.03 + Math.random() * 0.30)    // 왼쪽 프레임
+    : W * (0.67 + Math.random() * 0.30);   // 오른쪽 프레임
+  const x2 = x + (Math.random() * 120 - 60);
+  const y2 = H * (0.42 + Math.random() * 0.5);
+  const pts = makeJagged(x, -12, x2, y2, 9, 26);
+  const branches = [];
+  for (let i = 2; i < pts.length - 1; i++) {
+    if (Math.random() < 0.35) {
+      const p = pts[i];
+      const len = 30 + Math.random() * 70;
+      const ang = Math.PI / 2 + (Math.random() < 0.5 ? 1 : -1) * (0.4 + Math.random() * 0.7);
+      branches.push(makeJagged(p.x, p.y, p.x + Math.cos(ang) * len, p.y + Math.sin(ang) * len, 4, 10));
+    }
+  }
+  ambBolts.push({ pts, branches, born: performance.now(), dur: 90 + Math.random() * 150 });
+  // 은은한 전체 번쩍임 (게임 번개와 충돌 방지)
+  if (state !== STATE.STRIKING) {
+    flash.style.opacity = 0.05 + Math.random() * 0.06;
+    setTimeout(() => { if (state !== STATE.STRIKING) flash.style.opacity = 0; }, 70);
+  }
+}
+function strokeBg(pts, color, width) {
+  bgc.beginPath();
+  bgc.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) bgc.lineTo(pts[i].x, pts[i].y);
+  bgc.strokeStyle = color; bgc.lineWidth = width;
+  bgc.lineCap = "round"; bgc.lineJoin = "round";
+  bgc.shadowColor = "rgba(150,120,255,.85)"; bgc.shadowBlur = width * 2;
+  bgc.stroke(); bgc.shadowBlur = 0;
+}
+function drawAmbBolt(b, a) {
+  strokeBg(b.pts, "rgba(150,110,255," + (0.30 * a) + ")", 9);   // 보라 글로우
+  strokeBg(b.pts, "rgba(120,170,255," + (0.55 * a) + ")", 4);   // 블루
+  strokeBg(b.pts, "rgba(245,245,255," + (0.9 * a) + ")", 1.5);  // 흰 코어
+  b.branches.forEach(br => {
+    strokeBg(br, "rgba(150,170,255," + (0.4 * a) + ")", 2);
+    strokeBg(br, "rgba(245,245,255," + (0.6 * a) + ")", 1);
+  });
+}
+let ambTimer = 0, ambNext = 700, ambLast = performance.now();
+function ambLoop(now) {
+  requestAnimationFrame(ambLoop);
+  const dt = now - ambLast; ambLast = now;
+  bgc.clearRect(0, 0, innerWidth, innerHeight);
+
+  ambTimer += dt;
+  if (ambTimer > ambNext && state !== STATE.STRIKING) {
+    ambTimer = 0; ambNext = 1100 + Math.random() * 3000;
+    spawnAmbBolt();
+    if (Math.random() < 0.35) setTimeout(spawnAmbBolt, 80);   // 가끔 연속 번개
+  }
+  for (let i = ambBolts.length - 1; i >= 0; i--) {
+    const b = ambBolts[i];
+    const age = now - b.born;
+    if (age > b.dur) { ambBolts.splice(i, 1); continue; }
+    const flick = (Math.floor(age / 45) % 2 === 0) ? 1 : 0.45;   // 점멸
+    drawAmbBolt(b, (1 - age / b.dur) * flick);                   // 수명 동안 페이드
+  }
+}
+requestAnimationFrame(ambLoop);
+
+// ---- 상태 전환 ----
+function setHint(t) { hint.textContent = t; }
+
+function go(next) {
+  state = next;
+  searchBtn.classList.add("hidden");
+  loader.classList.add("hidden");
+  result.classList.add("hidden");
+  document.body.classList.remove("charging");
+
+  if (next === STATE.IDLE) {
+    clearField();
+    searchBtn.classList.remove("hidden");
+    setHint("버튼을 눌러 주변 식당을 모아보세요");
+  } else if (next === STATE.SEARCHING) {
+    loader.classList.remove("hidden");
+    setHint("");
+  } else if (next === STATE.READY) {
+    setHint("⚡ 화면을 길게 눌러 번개를 소환하세요!");
+  } else if (next === STATE.RESULT) {
+    result.classList.remove("hidden");
+  }
+}
+
+function clearField() {
+  field.innerHTML = "";
+  restos = [];
+  fxc.clearRect(0, 0, innerWidth, innerHeight);
+}
+
+// ---- 카테고리 필터 ----
+const CATS = ["전체", "한식", "중식", "일식", "양식", "분식", "카페", "기타"];
+const MAIN_CATS = ["한식", "중식", "일식", "양식", "분식", "카페"];
+const selectedCats = new Set();   // 비어 있으면 = 전체
+
+function catMatch(r) {
+  if (selectedCats.size === 0) return true;          // 전체
+  for (const c of selectedCats) {
+    // "기타" = 한·일·양·분식이 아닌 나머지(중식/아시안/치킨/멕시칸/샐러드 등)
+    if (c === "기타" ? !MAIN_CATS.includes(r.cat) : r.cat === c) return true;
+  }
+  return false;
+}
+function buildCats() {
+  const wrap = $("#cats"); wrap.innerHTML = "";
+  CATS.forEach(c => {
+    const on = (c === "전체") ? selectedCats.size === 0 : selectedCats.has(c);
+    const b = document.createElement("button");
+    b.className = "chip" + (on ? " active" : "");
+    b.textContent = c;
+    b.addEventListener("click", () => selectCat(c));
+    wrap.appendChild(b);
+  });
+}
+function selectCat(c) {
+  if (state === STATE.SEARCHING || state === STATE.STRIKING) return;
+  if (c === "전체") selectedCats.clear();                       // 필터 해제
+  else if (selectedCats.has(c)) selectedCats.delete(c);          // 토글 off
+  else selectedCats.add(c);                                      // 토글 on
+  buildCats();
+  // 이미 식당이 떠 있으면 로더 없이 즉시 재배치
+  if (restos.length || state === STATE.READY || state === STATE.RESULT) {
+    result.classList.add("hidden");
+    doScatter();
+    go(STATE.READY);
+  }
+}
+function poolForCat() {
+  const pool = POOL.filter(catMatch);
+  const n = Math.min(pool.length, 7 + Math.floor(Math.random() * 4));
+  return [...pool].sort(() => Math.random() - 0.5).slice(0, n);
+}
+function doScatter() { scatter(poolForCat()); }
+
+/* ============================================================
+   실제 주변 식당 검색 — 카카오맵 JavaScript SDK(services)
+   - JS 키를 localStorage에 저장, navigator.geolocation으로 좌표 획득
+   - FD6(음식점) + CE7(카페) 카테고리 검색 후 앱 구조로 매핑
+   - 키 없음/위치 거부/오류 시 더미 데이터로 폴백
+   ============================================================ */
+const KEY_LS = "kakaoJsKey";
+const getKey = () => (localStorage.getItem(KEY_LS) || "").trim();
+
+// SDK 동적 로드 (최초 1회)
+let sdkPromise = null;
+function loadKakaoSdk(key) {
+  if (window.kakao && window.kakao.maps && window.kakao.maps.services) return Promise.resolve();
+  if (sdkPromise) return sdkPromise;
+  sdkPromise = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://dapi.kakao.com/v2/maps/sdk.js?appkey=" +
+            encodeURIComponent(key) + "&libraries=services&autoload=false";
+    s.onload = () => window.kakao.maps.load(resolve);
+    s.onerror = () => { sdkPromise = null; reject(new Error("sdk-load")); };
+    document.head.appendChild(s);
+  });
+  return sdkPromise;
+}
+
+// 현재 위치
+function getPosition() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) { reject({ code: 0 }); return; }
+    navigator.geolocation.getCurrentPosition(
+      p => resolve(p.coords), err => reject(err),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 });
+  });
+}
+
+// 카테고리 1건 검색 (실패해도 빈 배열)
+function categorySearch(ps, code, loc, radius) {
+  return new Promise(resolve => {
+    ps.categorySearch(code, (data, status) => {
+      resolve(status === kakao.maps.services.Status.OK ? data : []);
+    }, { location: loc, radius, sort: kakao.maps.services.SortBy.DISTANCE });
+  });
+}
+
+// 카카오 → 주변 식당 목록
+async function fetchKakao(coords, key) {
+  await loadKakaoSdk(key);
+  const loc = new kakao.maps.LatLng(coords.latitude, coords.longitude);
+  const ps = new kakao.maps.services.Places();
+  const [food, cafe] = await Promise.all([
+    categorySearch(ps, "FD6", loc, 1200),   // 음식점
+    categorySearch(ps, "CE7", loc, 1200),   // 카페
+  ]);
+  return [...food, ...cafe].map(mapDoc);
+}
+
+// 카카오 문서 → 앱 식당 객체 (메뉴/가격은 카카오 미제공 → 빈 배열)
+function mapDoc(d) {
+  const cat = bucketOf(d.category_name, d.category_group_code);
+  return {
+    name: d.place_name,
+    cat,
+    ic: iconFor(cat, d.category_name),
+    menu: [],
+    dist: d.distance ? parseInt(d.distance, 10) : null,
+    phone: d.phone || "",
+    url: d.place_url || "",
+    addr: d.road_address_name || d.address_name || "",
+  };
+}
+
+// 카카오 카테고리명("음식점 > 한식 > 국밥") → 앱 칩 카테고리
+function bucketOf(catName, group) {
+  if (group === "CE7") return "카페";
+  const s = catName || "";
+  if (s.includes("분식")) return "분식";
+  if (s.includes("일식") || s.includes("초밥") || s.includes("돈까스") || s.includes("돈가스") || s.includes("일본")) return "일식";
+  if (s.includes("중식") || s.includes("중국")) return "중식";
+  if (s.includes("치킨")) return "치킨";
+  if (s.includes("양식") || s.includes("이탈리") || s.includes("패밀리") || s.includes("패스트") || s.includes("햄버거") || s.includes("피자")) return "양식";
+  if (s.includes("아시아") || s.includes("베트남") || s.includes("태국") || s.includes("인도")) return "아시안";
+  if (s.includes("뷔페")) return "양식";
+  if (s.includes("한식") || s.includes("국밥") || s.includes("백반") || s.includes("찌개") || s.includes("고기") || s.includes("해장") || s.includes("국수") || s.includes("죽")) return "한식";
+  return "기타";
+}
+
+const CAT_ICON = { 한식:"🍚", 중식:"🥟", 일식:"🍣", 양식:"🍝", 분식:"🍢",
+  아시안:"🍜", 치킨:"🍗", 카페:"☕", 멕시칸:"🌮", 샐러드:"🥗", 편의점:"🏪" };
+function iconFor(cat, catName) {
+  const s = catName || "";
+  if (s.includes("치킨")) return "🍗";
+  if (s.includes("피자")) return "🍕";
+  if (s.includes("햄버거") || s.includes("버거")) return "🍔";
+  if (s.includes("커피") || s.includes("카페")) return "☕";
+  if (s.includes("제과") || s.includes("베이커리") || s.includes("빵")) return "🥯";
+  return CAT_ICON[cat] || "🍴";
+}
+
+// ---- 식당 검색 ----
+async function search() {
+  const key = getKey();
+  if (!key) { openKeyModal(); return; }   // 키 없으면 입력 먼저
+
+  go(STATE.SEARCHING);
+  try {
+    const coords = await getPosition();
+    const list = await fetchKakao(coords, key);
+    if (!list.length) throw new Error("empty");
+    POOL = list; usingReal = true;
+    doScatter(); go(STATE.READY);
+  } catch (err) {
+    // 위치 거부 / 네트워크 / 키·도메인 오류 → 더미 폴백
+    POOL = DUMMY_POOL; usingReal = false;
+    doScatter(); go(STATE.READY);
+    setHint(fallbackMsg(err));
+    setTimeout(() => { if (state === STATE.READY) setHint("⚡ 화면을 길게 눌러 번개를 소환하세요!"); }, 2800);
+  }
+}
+function fallbackMsg(err) {
+  if (err && err.code === 1) return "📍 위치 권한이 거부돼 더미 데이터로 진행합니다";
+  if (err && err.message === "empty") return "🤔 주변에서 식당을 못 찾아 더미로 진행합니다";
+  if (err && err.message === "sdk-load") return "🔑 키/도메인을 확인하세요 — 더미로 진행합니다";
+  return "⚠️ 불러오지 못해 더미 데이터로 진행합니다";
+}
+
+// ---- 식당 아이콘 흩뿌리기 (겹침 최소화) ----
+function scatter(list) {
+  clearField();
+  const W = field.clientWidth, H = field.clientHeight;
+  // 좌우 여백 + 상단 살짝 + 하단은 게이지/힌트 영역을 비워 둠
+  const padX = 56, padTop = 28, padBottom = 110, minDist = 84;
+  const placed = [];
+
+  list.forEach((data, i) => {
+    let x, y, tries = 0;
+    do {
+      x = padX + Math.random() * (W - padX * 2);
+      y = padTop + Math.random() * (H - padTop - padBottom);
+      tries++;
+    } while (tries < 40 && placed.some(p => Math.hypot(p.x - x, p.y - y) < minDist));
+    placed.push({ x, y });
+
+    const el = document.createElement("div");
+    el.className = "resto";
+    el.style.left = x + "px";
+    el.style.top = y + "px";
+    el.style.animationDelay = (i * 60) + "ms";
+    el.innerHTML = `<div class="ic">${data.ic}</div><div class="nm">${data.name}</div>`;
+    field.appendChild(el);
+    restos.push({ el, x, y, data });
+  });
+}
+
+// ---- 번개 소환: 길게 눌러 충전 → 적당할 때 손을 떼면 발사 ----
+function onChargeStart() {
+  if (state !== STATE.READY) return;
+  charging = true;
+  overcharged = false;
+  chargeLevel = 0;
+  chargeStart = performance.now();
+  document.body.classList.add("charging");
+  gauge.classList.remove("hidden", "over");
+  setHint("⚡ 충전 중… 게이지가 꽉 찰 때 손을 떼라!");
+  buzz(12);   // 충전 시작 짧은 진동
+  chargeRAF = requestAnimationFrame(chargeLoop);
+}
+
+function chargeLoop(now) {
+  if (!charging) return;
+  const elapsed = now - chargeStart;
+  chargeLevel = Math.min(1, elapsed / CHARGE_MS);
+
+  gfill.style.width = (chargeLevel * 100) + "%";
+  gpct.textContent = Math.round(chargeLevel * 100);
+  // 충전될수록 하늘이 어두워지는 폭풍 연출 (#storm 비네팅 강도)
+  document.documentElement.style.setProperty("--charge", chargeLevel.toFixed(3));
+  // 퍼펙트 존(85%+) 진입 시 화면 가장자리 맥동 + 진입 순간 한 번 진동
+  const nowPerfect = chargeLevel >= 0.85;
+  if (nowPerfect && !document.body.classList.contains("perfect")) buzz(8);
+  document.body.classList.toggle("perfect", nowPerfect);
+
+  if (chargeLevel >= 1) {
+    gauge.classList.add("over");
+    // 과충전 → 폭발(빗나감)
+    if (elapsed - CHARGE_MS > OVER_MS) {
+      overcharged = true;
+      fire(1, true);
+      return;
+    }
+  }
+  chargeRAF = requestAnimationFrame(chargeLoop);
+}
+
+function onChargeEnd() {
+  if (!charging) return;
+  charging = false;
+  cancelAnimationFrame(chargeRAF);
+  if (overcharged) return;        // 이미 폭발 처리됨
+  fire(chargeLevel, false);
+}
+
+function resetCharge() {
+  charging = false;
+  cancelAnimationFrame(chargeRAF);
+  document.body.classList.remove("charging", "perfect");
+  gauge.classList.add("hidden");
+  gauge.classList.remove("over");
+  document.documentElement.style.setProperty("--charge", "0");
+}
+
+// power: 0..1 충전량,  forceMiss: 과충전 폭발이면 무조건 빗나감
+function fire(power, forceMiss) {
+  if (state !== STATE.READY || restos.length === 0) { resetCharge(); return; }
+  state = STATE.STRIKING;
+  resetCharge();
+
+  // 명중률: 충전이 높을수록 잘 맞음 (0.15 ~ 1.0)
+  const hitChance = 0.15 + 0.85 * power;
+  const miss = forceMiss || Math.random() > hitChance;
+
+  if (miss) {
+    // 식당이 없는 임의 지점으로 떨어짐
+    const mx = 40 + Math.random() * (innerWidth - 80);
+    const my = innerHeight * 0.45 + Math.random() * (innerHeight * 0.4);
+    const sx = mx + (Math.random() * 80 - 40);
+    buzz(forceMiss ? [40, 30, 40] : 20);   // 과충전=두 번 터짐 / 일반 빗나감=짧게
+    strike(sx, 30, mx, my, power, () => {
+      state = STATE.READY;
+      setHint(forceMiss
+        ? "💥 과충전! 번개가 허공에서 터졌다… 다시!"
+        : "⚡ 빗나갔다! 더 충전해서 다시 노려봐");
+    });
+    return;
+  }
+
+  // 명중 → 난수로 식당 선택
+  const winnerIdx = Math.floor(Math.random() * restos.length);
+  const winner = restos[winnerIdx];
+  // 파워가 높을수록 정확히 머리 위에서 내리꽂힘
+  const sx = winner.x + (Math.random() * 60 - 30) * (1 - power);
+  buzz([0, 60, 40, 90]);   // 명중! 강한 임팩트 진동
+  strike(sx, 30, winner.x, winner.y, power, () => {
+    restos.forEach((r, i) => r.el.classList.add(i === winnerIdx ? "winner" : "dim"));
+    showResult(winner.data, power);
+  });
+}
+
+// ---- 번개 애니메이션 ----
+function strike(x1, y1, x2, y2, power, done) {
+  let frame = 0;
+  const flickers = 4 + Math.round(power * 4);   // 파워 높으면 더 길게 번쩍
+  setHint("");
+
+  function bolt() {
+    fxc.clearRect(0, 0, innerWidth, innerHeight);
+    if (frame < flickers) {
+      drawBolt(x1, y1, x2, y2, 1, power);
+      // 번쩍임 (파워 비례)
+      flash.style.opacity = (frame % 2 === 0 ? 0.9 : 0.3) * (0.5 + power * 0.5);
+      // 화면 흔들림 (파워 비례)
+      const sh = 3 + power * 8;
+      document.body.style.transform =
+        `translate(${(Math.random()*2-1)*sh}px, ${(Math.random()*2-1)*sh}px)`;
+      frame++;
+      setTimeout(() => requestAnimationFrame(bolt), 55);
+    } else {
+      flash.style.opacity = 0;
+      document.body.style.transform = "";
+      // 잔상 한 줄 남겼다가 사라지기
+      drawBolt(x1, y1, x2, y2, 0.5, power);
+      setTimeout(() => fxc.clearRect(0, 0, innerWidth, innerHeight), 200);
+      done && done();
+    }
+  }
+  bolt();
+}
+
+// 지그재그 번개 경로 + 가지 (power 높을수록 굵고 곧고 화려)
+function drawBolt(x1, y1, x2, y2, alpha = 1, power = 1) {
+  const jitter = 30 - power * 16;          // 파워 높으면 덜 흔들림(정확)
+  const steps  = 6 + Math.round(power * 4);
+  const segs = makeJagged(x1, y1, x2, y2, steps, jitter);
+  // 외곽 글로우
+  strokePath(segs, "rgba(180,160,255," + (0.35*alpha) + ")", 10 + power * 8);
+  strokePath(segs, "rgba(253,246,168," + (0.6*alpha) + ")", 4 + power * 4);
+  // 코어
+  strokePath(segs, "rgba(255,255,255," + alpha + ")", 1.4 + power * 1.8);
+
+  // 가지 번개 (파워 높을수록 가지 많음)
+  const branchProb = 0.2 + power * 0.4;
+  for (let i = 2; i < segs.length - 1; i++) {
+    if (Math.random() < branchProb) {
+      const p = segs[i];
+      const len = 30 + Math.random() * 50;
+      const ang = Math.atan2(y2 - y1, x2 - x1) + (Math.random() < .5 ? 1 : -1) * (0.5 + Math.random()*0.6);
+      const bx = p.x + Math.cos(ang) * len, by = p.y + Math.sin(ang) * len;
+      const branch = makeJagged(p.x, p.y, bx, by, 4, 12);
+      strokePath(branch, "rgba(253,246,168," + (0.5*alpha) + ")", 3);
+      strokePath(branch, "rgba(255,255,255," + (0.7*alpha) + ")", 1.2);
+    }
+  }
+}
+
+function makeJagged(x1, y1, x2, y2, steps, jitter) {
+  const pts = [{ x: x1, y: y1 }];
+  for (let i = 1; i < steps; i++) {
+    const t = i / steps;
+    pts.push({
+      x: x1 + (x2 - x1) * t + (Math.random() * 2 - 1) * jitter,
+      y: y1 + (y2 - y1) * t + (Math.random() * 2 - 1) * jitter * 0.6,
+    });
+  }
+  pts.push({ x: x2, y: y2 });
+  return pts;
+}
+
+function strokePath(pts, color, width) {
+  fxc.beginPath();
+  fxc.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) fxc.lineTo(pts[i].x, pts[i].y);
+  fxc.strokeStyle = color;
+  fxc.lineWidth = width;
+  fxc.lineCap = "round";
+  fxc.lineJoin = "round";
+  fxc.shadowColor = "rgba(253,246,168,.8)";
+  fxc.shadowBlur = width * 1.5;
+  fxc.stroke();
+  fxc.shadowBlur = 0;
+}
+
+// ---- 결과 표시 ----
+function showResult(data, power = 1) {
+  const dist = (data.dist != null) ? data.dist : 50 + Math.floor(Math.random() * 750);
+  const verdict = power >= 0.85 ? "⚡ 완벽한 일격!"
+                 : power >= 0.6 ? "제우스의 선택"
+                 : "아슬아슬하게 명중";
+  result.querySelector(".ic").textContent = data.ic;
+  result.querySelector(".rname").textContent = data.name;
+  let meta = `${data.cat} · 약 ${dist}m · ${verdict}`;
+  if (data.phone) meta += ` · ☎ ${data.phone}`;
+  result.querySelector(".meta").textContent = meta;
+
+  // 메뉴/가격 목록 (더미에만 존재. 카카오 실데이터는 메뉴 없음 → 숨김)
+  const ul = result.querySelector("ul.menu");
+  const menuTitle = result.querySelector(".menu-title");
+  ul.innerHTML = "";
+  const hasMenu = (data.menu || []).length > 0;
+  menuTitle.classList.toggle("hidden", !hasMenu);
+  ul.classList.toggle("hidden", !hasMenu);
+  (data.menu || []).forEach(([name, price]) => {
+    const li = document.createElement("li");
+    const mn = document.createElement("span"); mn.className = "mn"; mn.textContent = name;
+    const mp = document.createElement("span"); mp.className = "mp";
+    mp.textContent = price > 0 ? price.toLocaleString("ko-KR") + "원" : "무료";
+    li.append(mn, mp);
+    ul.appendChild(li);
+  });
+
+  // 실데이터: 카카오맵 링크 (있을 때만)
+  const extra = result.querySelector(".place-extra");
+  const link = result.querySelector(".placelink");
+  if (data.url) { link.href = data.url; extra.classList.remove("hidden"); }
+  else { extra.classList.add("hidden"); }
+
+  setTimeout(() => go(STATE.RESULT), 700);
+}
+
+// ---- API 키 모달 ----
+const keyWrap = $("#keyWrap"), keyInput = $("#keyInput");
+function openKeyModal() {
+  keyInput.value = getKey();
+  keyWrap.classList.remove("hidden");
+  setTimeout(() => keyInput.focus(), 60);
+}
+function closeKeyModal() { keyWrap.classList.add("hidden"); }
+$("#keyBtn").addEventListener("click", openKeyModal);
+$("#keySave").addEventListener("click", () => {
+  const v = keyInput.value.trim();
+  if (!v) { keyInput.focus(); return; }
+  localStorage.setItem(KEY_LS, v);
+  closeKeyModal();
+  search();
+});
+$("#keySkip").addEventListener("click", () => {
+  closeKeyModal();
+  POOL = DUMMY_POOL; usingReal = false;
+  go(STATE.SEARCHING);
+  setTimeout(() => { doScatter(); go(STATE.READY); }, 800);
+});
+keyInput.addEventListener("keydown", e => { if (e.key === "Enter") $("#keySave").click(); });
+keyWrap.querySelector(".backdrop").addEventListener("click", closeKeyModal);
+
+// ---- 이벤트 바인딩 ----
+searchBtn.addEventListener("click", search);
+$("#researchBtn").addEventListener("click", search);
+$("#againBtn").addEventListener("click", () => {
+  result.classList.add("hidden");
+  restos.forEach(r => r.el.classList.remove("winner", "dim"));
+  state = STATE.READY;
+  go(STATE.READY);
+});
+
+// 하늘(놀이판) 길게 누르기로 번개 충전 → 발사
+["pointerdown"].forEach(ev => field.addEventListener(ev, onChargeStart));
+["pointerup", "pointercancel", "pointerleave"].forEach(ev =>
+  field.addEventListener(ev, onChargeEnd));
+// 구름띠도 충전 영역으로
+cloudband.addEventListener("pointerdown", onChargeStart);
+["pointerup", "pointercancel", "pointerleave"].forEach(ev =>
+  cloudband.addEventListener(ev, onChargeEnd));
+
+// ---- PWA: 서비스워커 등록 (https 또는 localhost에서만 동작) ----
+if ("serviceWorker" in navigator) {
+  addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(err => console.warn("SW 등록 실패:", err));
+  });
+}
+
+// 시작
+buildCats();
+go(STATE.IDLE);
+</script>
+</body>
+</html>

@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>점심 룰렛 — 오늘 뭐 먹지?</title>
+<style>
+  :root {
+    --bg: #fff7ed;
+    --card: #ffffff;
+    --ink: #2b2b2b;
+    --muted: #8a8a8a;
+    --line: #f0e6d8;
+    --accent: #ff6b35;
+    --accent-dark: #e2552a;
+    --shadow: 0 10px 30px rgba(0,0,0,.08);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 24px 16px 60px;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 24px; }
+  header h1 { font-size: 1.9rem; margin: 0 0 6px; }
+  header p { margin: 0; color: var(--muted); }
+
+  .layout { display: grid; grid-template-columns: 1fr; gap: 24px; }
+  @media (min-width: 760px) { .layout { grid-template-columns: 360px 1fr; align-items: start; } }
+
+  .card {
+    background: var(--card);
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    padding: 22px;
+  }
+
+  /* 룰렛 영역 */
+  .roulette-card { text-align: center; }
+  .wheel-box { position: relative; width: 300px; height: 300px; margin: 0 auto 16px; }
+  .pointer {
+    position: absolute; top: -6px; left: 50%; transform: translateX(-50%);
+    width: 0; height: 0;
+    border-left: 16px solid transparent;
+    border-right: 16px solid transparent;
+    border-top: 26px solid var(--accent-dark);
+    z-index: 3;
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,.2));
+  }
+  #wheel {
+    width: 300px; height: 300px; border-radius: 50%;
+    transition: transform 4.5s cubic-bezier(.17,.67,.2,1);
+    box-shadow: inset 0 0 0 8px rgba(255,255,255,.6), 0 8px 24px rgba(0,0,0,.15);
+  }
+  .hub {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    width: 54px; height: 54px; border-radius: 50%; background: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,.2); z-index: 2;
+    display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
+  }
+  .spin-btn {
+    width: 100%; padding: 16px; font-size: 1.1rem; font-weight: 700;
+    color: #fff; background: var(--accent); border: none; border-radius: 14px;
+    cursor: pointer; transition: background .15s, transform .05s;
+  }
+  .spin-btn:hover { background: var(--accent-dark); }
+  .spin-btn:active { transform: scale(.98); }
+  .spin-btn:disabled { background: #d9c9bb; cursor: not-allowed; }
+  .result {
+    margin-top: 16px; font-size: 1.4rem; font-weight: 800; min-height: 1.6em;
+    color: var(--accent-dark);
+  }
+
+  /* 목록 영역 */
+  .list-card h2 { margin: 0 0 14px; font-size: 1.2rem; }
+  .add-row { display: flex; gap: 8px; margin-bottom: 8px; }
+  .add-row input, .add-row select, .filter select {
+    padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px;
+    font-size: .95rem; font-family: inherit; background: #fff;
+  }
+  .add-row input { flex: 1; min-width: 0; }
+  .add-row button {
+    padding: 0 18px; border: none; border-radius: 10px; background: var(--ink);
+    color: #fff; font-weight: 700; cursor: pointer;
+  }
+  .filter { display: flex; align-items: center; gap: 8px; margin: 4px 0 14px; }
+  .filter label { color: var(--muted); font-size: .9rem; }
+  .filter select { flex: 1; }
+
+  ul.list { list-style: none; margin: 0; padding: 0; max-height: 360px; overflow-y: auto; }
+  ul.list li {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 4px; border-bottom: 1px solid var(--line);
+  }
+  ul.list li .name { flex: 1; font-weight: 600; }
+  ul.list li .tag {
+    font-size: .75rem; padding: 3px 9px; border-radius: 999px;
+    background: #fff1e9; color: var(--accent-dark); font-weight: 700;
+  }
+  ul.list li button.del {
+    border: none; background: transparent; color: var(--muted);
+    cursor: pointer; font-size: 1.1rem; line-height: 1;
+  }
+  ul.list li button.del:hover { color: #d33; }
+  .empty { color: var(--muted); text-align: center; padding: 24px 0; }
+  .count { color: var(--muted); font-size: .85rem; margin-top: 8px; text-align: right; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🍱 점심 룰렛</h1>
+    <p>오늘 점심 뭐 먹지? 룰렛 돌려서 정하자!</p>
+  </header>
+
+  <div class="layout">
+    <!-- 룰렛 -->
+    <section class="card roulette-card">
+      <div class="wheel-box">
+        <div class="pointer"></div>
+        <canvas id="wheel" width="600" height="600"></canvas>
+        <div class="hub">🎯</div>
+      </div>
+      <button class="spin-btn" id="spinBtn">룰렛 돌리기!</button>
+      <div class="result" id="result"></div>
+    </section>
+
+    <!-- 목록 관리 -->
+    <section class="card list-card">
+      <h2>식당 목록</h2>
+      <div class="add-row">
+        <input type="text" id="nameInput" placeholder="식당 이름" maxlength="20" />
+        <select id="catInput">
+          <option value="한식">한식</option>
+          <option value="중식">중식</option>
+          <option value="일식">일식</option>
+          <option value="양식">양식</option>
+          <option value="분식">분식</option>
+          <option value="아시안">아시안</option>
+          <option value="기타">기타</option>
+        </select>
+        <button id="addBtn">추가</button>
+      </div>
+      <div class="filter">
+        <label for="filterSel">룰렛 대상</label>
+        <select id="filterSel">
+          <option value="전체">전체</option>
+          <option value="한식">한식</option>
+          <option value="중식">중식</option>
+          <option value="일식">일식</option>
+          <option value="양식">양식</option>
+          <option value="분식">분식</option>
+          <option value="아시안">아시안</option>
+          <option value="기타">기타</option>
+        </select>
+      </div>
+      <ul class="list" id="list"></ul>
+      <div class="count" id="count"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = "lunch-roulette-restaurants";
+
+const COLORS = ["#ff6b35","#ffb142","#f7d794","#78e08f","#60a3bc",
+                "#7d5fff","#e66767","#cf6a87","#3dc1d3","#ff9ff3"];
+
+const DEFAULTS = [
+  { name: "김치찌개집", cat: "한식" },
+  { name: "마라탕", cat: "중식" },
+  { name: "초밥뷔페", cat: "일식" },
+  { name: "파스타집", cat: "양식" },
+  { name: "분식천국", cat: "분식" },
+  { name: "쌀국수", cat: "아시안" },
+];
+
+let restaurants = load();
+let spinning = false;
+let currentRotation = 0;
+
+const wheel = document.getElementById("wheel");
+const ctx = wheel.getContext("2d");
+const spinBtn = document.getElementById("spinBtn");
+const resultEl = document.getElementById("result");
+const listEl = document.getElementById("list");
+const countEl = document.getElementById("count");
+const filterSel = document.getElementById("filterSel");
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return DEFAULTS.slice();
+}
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(restaurants));
+}
+
+function filtered() {
+  const f = filterSel.value;
+  return f === "전체" ? restaurants : restaurants.filter(r => r.cat === f);
+}
+
+function drawWheel() {
+  const items = filtered();
+  const size = wheel.width;
+  const cx = size / 2, cy = size / 2, r = size / 2 - 10;
+  ctx.clearRect(0, 0, size, size);
+
+  if (items.length === 0) {
+    ctx.fillStyle = "#eee";
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#999"; ctx.font = "bold 28px sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("목록이 비었어요", cx, cy);
+    return;
+  }
+
+  const slice = (Math.PI * 2) / items.length;
+  for (let i = 0; i < items.length; i++) {
+    const start = i * slice - Math.PI / 2;
+    const end = start + slice;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, start, end);
+    ctx.closePath();
+    ctx.fillStyle = COLORS[i % COLORS.length];
+    ctx.fill();
+
+    // 텍스트
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(start + slice / 2);
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 26px 'Malgun Gothic', sans-serif";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    let label = items[i].name;
+    if (label.length > 8) label = label.slice(0, 7) + "…";
+    ctx.fillText(label, r - 18, 0);
+    ctx.restore();
+  }
+}
+
+function renderList() {
+  listEl.innerHTML = "";
+  if (restaurants.length === 0) {
+    listEl.innerHTML = '<li class="empty">식당을 추가해 주세요 🙂</li>';
+  } else {
+    restaurants.forEach((r, idx) => {
+      const li = document.createElement("li");
+      li.innerHTML = `
+        <span class="name"></span>
+        <span class="tag"></span>
+        <button class="del" title="삭제">✕</button>`;
+      li.querySelector(".name").textContent = r.name;
+      li.querySelector(".tag").textContent = r.cat;
+      li.querySelector(".del").addEventListener("click", () => removeRestaurant(idx));
+      listEl.appendChild(li);
+    });
+  }
+  const f = filtered();
+  countEl.textContent = `전체 ${restaurants.length}곳 · 룰렛 대상 ${f.length}곳`;
+  drawWheel();
+}
+
+function addRestaurant() {
+  const nameInput = document.getElementById("nameInput");
+  const catInput = document.getElementById("catInput");
+  const name = nameInput.value.trim();
+  if (!name) { nameInput.focus(); return; }
+  restaurants.push({ name, cat: catInput.value });
+  save();
+  nameInput.value = "";
+  nameInput.focus();
+  renderList();
+}
+
+function removeRestaurant(idx) {
+  restaurants.splice(idx, 1);
+  save();
+  renderList();
+}
+
+function spin() {
+  const items = filtered();
+  if (spinning) return;
+  if (items.length === 0) { resultEl.textContent = "룰렛 대상이 없어요!"; return; }
+  if (items.length === 1) {
+    resultEl.textContent = `오늘은 「${items[0].name}」 🍴`;
+    return;
+  }
+
+  spinning = true;
+  spinBtn.disabled = true;
+  resultEl.textContent = "";
+
+  const slice = 360 / items.length;
+  const winner = Math.floor(Math.random() * items.length);
+  // 당첨 슬라이스 중앙이 포인터(12시)에 오도록
+  const targetAngle = 360 * 6 + (360 - (winner * slice + slice / 2));
+  currentRotation += targetAngle;
+  wheel.style.transform = `rotate(${currentRotation}deg)`;
+
+  setTimeout(() => {
+    spinning = false;
+    spinBtn.disabled = false;
+    resultEl.textContent = `오늘 점심은 「${items[winner].name}」! 🎉`;
+  }, 4600);
+}
+
+// 이벤트 바인딩
+document.getElementById("addBtn").addEventListener("click", addRestaurant);
+document.getElementById("nameInput").addEventListener("keydown", e => {
+  if (e.key === "Enter") addRestaurant();
+});
+spinBtn.addEventListener("click", spin);
+filterSel.addEventListener("change", () => { resultEl.textContent = ""; renderList(); });
+
+renderList();
+</script>
+</body>
+</html>

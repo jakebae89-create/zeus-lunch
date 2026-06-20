@@ -1551,7 +1551,7 @@ def gen_kbo():
 # ─────────────────────────────────────────────
 def main():
     gen_geo(); gen_elements(); gen_animals(); gen_sci_terms(); gen_vocab()
-    gen_idioms(); gen_jeolgi(); gen_proverbs()   # gen_zodiac(별자리)·gen_dueti(연도→띠) 제외: 계산형이라 '상식'에 안 맞음
+    gen_idioms(); gen_proverbs()   # 제외: gen_zodiac(별자리)·gen_dueti(연도→띠)·gen_jeolgi(절기 순서) — 계산·암기형이라 '상식'에 안 맞음
     gen_curated(); gen_kbo()
     random.shuffle(BANK)
     from collections import Counter

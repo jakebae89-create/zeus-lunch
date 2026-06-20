@@ -294,6 +294,19 @@
   }
   #keyBtn:active { transform: scale(.92); }
 
+  /* 항상 보이는 퀴즈 진입 버튼 (좌측 상단) */
+  #quizFab {
+    position: fixed; top: calc(14px + env(safe-area-inset-top)); left: 14px; z-index: 55;
+    height: 40px; padding: 0 14px; border-radius: 12px; cursor: pointer;
+    font-size: .9rem; font-weight: 700; line-height: 1; pointer-events: auto;
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,.08); color: var(--ink);
+    border: 1.5px solid rgba(255,255,255,.18); backdrop-filter: blur(4px);
+    transition: transform .06s, background .15s;
+  }
+  #quizFab:hover { background: rgba(255,255,255,.14); }
+  #quizFab:active { transform: scale(.92); }
+
   #keyWrap {
     position: fixed; inset: 0; z-index: 70;
     display: flex; align-items: center; justify-content: center; padding: 24px;
@@ -358,6 +371,7 @@
   </div>
 
   <button id="keyBtn" title="카카오 API 키 설정">🔑</button>
+  <button id="quizFab" title="레트로 퀴즈 열기">🕹️ 퀴즈</button>
 
   <div id="cats"></div>
 
@@ -684,7 +698,27 @@ function doScatter() { scatter(poolForCat()); }
    - 키 없음/위치 거부/오류 시 더미 데이터로 폴백
    ============================================================ */
 const KEY_LS = "kakaoJsKey";
-const getKey = () => (localStorage.getItem(KEY_LS) || "").trim();
+
+/* ───────── 카카오 JavaScript 키 (앱 내장) ─────────
+   ▸ 카카오 개발자센터 → 내 애플리케이션 → 앱 키 → "JavaScript 키" 값을
+     아래 큰따옴표 안에 붙여넣으세요. 그러면 사용자는 키 입력 없이 바로 사용합니다.
+   ▸ JS 키는 클라이언트에 노출될 수밖에 없으므로, 반드시
+     [플랫폼 → Web → 사이트 도메인]에 배포 주소(GitHub Pages 도메인)를 등록해
+     다른 사이트에서의 무단 사용을 차단하세요.
+   ▸ 비워두면 기존처럼 "사용자가 직접 키를 입력"하는 모드로 동작합니다. */
+const DEFAULT_KAKAO_JS_KEY = "53b5ece312796549c932b5d37b1bcb82";
+
+// 직접 입력해 저장한 키가 있으면 우선, 없으면 내장 키 사용
+const getKey = () => {
+  const saved = (localStorage.getItem(KEY_LS) || "").trim();
+  return saved || DEFAULT_KAKAO_JS_KEY.trim();
+};
+
+// 키가 내장돼 있으면 일반 위치기반 앱처럼 키 버튼/모달을 노출하지 않는다
+if (DEFAULT_KAKAO_JS_KEY.trim()) {
+  const _kb = document.getElementById("keyBtn");
+  if (_kb) _kb.style.display = "none";
+}
 
 // SDK 동적 로드 (최초 1회)
 let sdkPromise = null;
@@ -1120,6 +1154,7 @@ function openQuiz() {
 }
 function closeQuiz() { quizWrap.classList.add("hidden"); }
 quizBtn.addEventListener("click", openQuiz);
+$("#quizFab").addEventListener("click", openQuiz);
 $("#quizClose").addEventListener("click", closeQuiz);
 
 // ---- 이벤트 바인딩 ----

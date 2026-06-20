@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>상식 퀴즈 - RETRO QUIZ</title>
+<title>레트로 퀴즈</title>
 <meta name="theme-color" content="#0a0a16">
 <!-- 제우스의 점심 안에 오버레이(iframe)로 임베드됨 — PWA/서비스워커는 부모 앱이 담당 -->
 <style>
@@ -185,7 +185,7 @@
 
   <!-- ══ 타이틀 ══ -->
   <section id="title">
-    <h1>상식 퀴즈</h1>
+    <h1>레트로 퀴즈</h1>
     <div class="hi" id="hiTitle">HI-SCORE&nbsp; 0</div>
 
     <div class="selopt">
@@ -267,7 +267,7 @@
 </div>
 
 <!-- 자동 생성된 대용량 문제 은행 (3000+). 없으면 아래 내장 문제로 대체 -->
-<script src="questions.js?v=7"></script>
+<script src="questions.js?v=11"></script>
 <script>
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 문제 은행 (상식)  answer = 정답 인덱스
@@ -353,8 +353,8 @@ let stageMaxed = false;       // 레벨 3까지 모두 클리어함
 const CATS = [
   { key:'ALL', label:'전체' }, { key:'SCI', label:'과학' },
   { key:'HIS', label:'역사' }, { key:'GEO', label:'지리' },
-  { key:'GEN', label:'상식' }, { key:'LANG', label:'우리말' },
-  { key:'KBO', label:'야구' },
+  { key:'GEN', label:'일반 상식' }, { key:'LANG', label:'우리말' },
+  { key:'IDIOM', label:'사자성어' }, { key:'KBO', label:'야구' },
 ];
 const LVLS = [
   { key:0, label:'전체' }, { key:1, label:'1' }, { key:2, label:'2' }, { key:3, label:'3' },

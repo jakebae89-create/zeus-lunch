@@ -294,19 +294,6 @@
   }
   #keyBtn:active { transform: scale(.92); }
 
-  /* 항상 보이는 퀴즈 진입 버튼 (좌측 상단) */
-  #quizFab {
-    position: fixed; top: calc(14px + env(safe-area-inset-top)); left: 14px; z-index: 55;
-    height: 40px; padding: 0 14px; border-radius: 12px; cursor: pointer;
-    font-size: .9rem; font-weight: 700; line-height: 1; pointer-events: auto;
-    display: inline-flex; align-items: center; gap: 6px;
-    background: rgba(255,255,255,.08); color: var(--ink);
-    border: 1.5px solid rgba(255,255,255,.18); backdrop-filter: blur(4px);
-    transition: transform .06s, background .15s;
-  }
-  #quizFab:hover { background: rgba(255,255,255,.14); }
-  #quizFab:active { transform: scale(.92); }
-
   #keyWrap {
     position: fixed; inset: 0; z-index: 70;
     display: flex; align-items: center; justify-content: center; padding: 24px;
@@ -371,7 +358,6 @@
   </div>
 
   <button id="keyBtn" title="카카오 API 키 설정">🔑</button>
-  <button id="quizFab" title="레트로 퀴즈 열기">🕹️ 퀴즈</button>
 
   <div id="cats"></div>
 
@@ -398,7 +384,7 @@
 
     <!-- 시작 화면 -->
     <button class="btn" id="searchBtn">📡 주변 식당 검색하기</button>
-    <button class="btn ghost" id="quizBtn">🕹️ 레트로 퀴즈</button>
+    <button class="btn ghost" id="quizBtn">🕹️ 레트로 퀴즈 풀기</button>
 
     <!-- 로딩 -->
     <div id="loader" class="hidden">
@@ -506,7 +492,6 @@ const field   = $("#field");
 const hint     = $("#hint");
 const searchBtn= $("#searchBtn");
 const quizBtn  = $("#quizBtn");
-const quizFab  = $("#quizFab");
 const loader   = $("#loader");
 const result   = $("#resultWrap");
 const flash     = $("#flash");
@@ -623,7 +608,6 @@ function go(next) {
   state = next;
   searchBtn.classList.add("hidden");
   quizBtn.classList.add("hidden");
-  quizFab.classList.remove("hidden");   // 진행 중에는 좌상단 고정 버튼 노출
   loader.classList.add("hidden");
   result.classList.add("hidden");
   document.body.classList.remove("charging");
@@ -632,12 +616,12 @@ function go(next) {
     clearField();
     searchBtn.classList.remove("hidden");
     quizBtn.classList.remove("hidden");
-    quizFab.classList.add("hidden");    // 시작 화면에선 하단 큰 버튼만
-    setHint("버튼을 눌러 주변 식당을 모아보세요");
+    setHint("");
   } else if (next === STATE.SEARCHING) {
     loader.classList.remove("hidden");
     setHint("");
   } else if (next === STATE.READY) {
+    quizBtn.classList.remove("hidden");   // 검색(게임) 화면에서도 하단에 퀴즈 버튼 노출
     setHint("⚡ 화면을 길게 눌러 번개를 소환하세요!");
   } else if (next === STATE.RESULT) {
     result.classList.remove("hidden");
@@ -1268,7 +1252,6 @@ function openQuiz() {
 }
 function closeQuiz() { quizWrap.classList.add("hidden"); }
 quizBtn.addEventListener("click", openQuiz);
-$("#quizFab").addEventListener("click", openQuiz);
 $("#quizClose").addEventListener("click", closeQuiz);
 
 // ---- 이벤트 바인딩 ----

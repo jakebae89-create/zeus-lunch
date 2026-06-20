@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>개인정보처리방침 — 제우스의 점심</title>
+<style>
+  :root { --bg:#0f0a1f; --panel:#1c1834; --ink:#f5f3ff; --muted:#b9b4d6; --accent:#ffd34e; }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; padding:24px 16px 64px; background:var(--bg); color:var(--ink);
+    font-family:"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif; line-height:1.7;
+  }
+  main { max-width:720px; margin:0 auto; }
+  h1 { font-size:1.5rem; margin:0 0 4px; }
+  .updated { color:var(--muted); font-size:.85rem; margin-bottom:24px; }
+  h2 { font-size:1.1rem; margin:28px 0 8px; color:var(--accent); }
+  p, li { color:#e8e5f7; }
+  ul { padding-left:20px; }
+  a { color:#9fd0ff; }
+  .box { background:var(--panel); border-radius:12px; padding:16px 18px; margin-top:8px; }
+  code { background:rgba(255,255,255,.08); padding:1px 6px; border-radius:5px; }
+  footer { color:var(--muted); font-size:.8rem; margin-top:40px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>개인정보처리방침</h1>
+  <div class="updated">제우스의 점심 (Zeus's Lunch) · 시행일: 2026-06-20</div>
+
+  <p>
+    본 방침은 모바일/웹 애플리케이션 <b>‘제우스의 점심’</b>(이하 “본 앱”)이 이용자의 정보를
+    어떻게 다루는지 설명합니다. 본 앱은 별도의 회원가입이 없으며, 개발자가 운영하는 서버로
+    개인정보를 수집·저장·전송하지 않습니다.
+  </p>
+
+  <h2>1. 수집하는 정보</h2>
+  <div class="box">
+    본 앱은 개발자 서버에서 이용자의 개인정보를 <b>수집하지 않습니다.</b>
+    아래 정보는 모두 이용자의 기기 안에서만 처리됩니다.
+    <ul>
+      <li><b>위치 정보(GPS)</b> — ‘주변 식당 검색’ 기능을 사용할 때만, 주변 식당을 찾기 위해 사용됩니다.
+        위치 좌표는 카카오맵 장소검색 API 호출에만 쓰이며, 개발자 서버에는 전송·저장되지 않습니다.</li>
+      <li><b>카카오 JavaScript 키</b> — 이용자가 직접 입력한 경우, 기기의 브라우저 저장소
+        (<code>localStorage</code>)에만 저장됩니다.</li>
+      <li><b>퀴즈 점수·랭킹(명예의 전당)</b> — 레트로 퀴즈의 기록은 기기의
+        <code>localStorage</code>에만 저장되며 외부로 전송되지 않습니다.</li>
+    </ul>
+  </div>
+
+  <h2>2. 제3자(카카오) 서비스</h2>
+  <p>
+    ‘주변 식당 검색’ 기능은 카카오맵(Kakao) 장소검색 API를 이용합니다. 이 기능을 사용할 때
+    이용자의 위치 좌표가 카카오 서버로 전송되어 주변 식당 정보를 받아옵니다. 카카오의
+    데이터 처리는 카카오의 개인정보처리방침을 따릅니다.
+    <br />· 카카오 개인정보처리방침: <a href="https://privacy.kakao.com" target="_blank" rel="noopener">https://privacy.kakao.com</a>
+  </p>
+  <p>
+    위치 권한을 허용하지 않거나 카카오 키를 입력하지 않으면, 본 앱은 위치 정보를 사용하지 않고
+    내장된 예시(더미) 식당 데이터로만 동작합니다.
+  </p>
+
+  <h2>3. 권한 안내</h2>
+  <ul>
+    <li><b>위치(Location)</b> — 주변 식당을 찾기 위해 사용. 거부해도 더미 데이터로 앱 이용 가능.</li>
+    <li><b>인터넷(Network)</b> — 카카오 지도 데이터를 불러오기 위해 사용.</li>
+  </ul>
+
+  <h2>4. 광고·분석·추적</h2>
+  <p>본 앱은 광고를 게재하지 않으며, 분석 도구(애널리틱스)나 광고 식별자를 통한 추적을 하지 않습니다.</p>
+
+  <h2>5. 아동의 개인정보</h2>
+  <p>본 앱은 개인정보를 수집하지 않으므로 아동으로부터 어떠한 개인정보도 수집하지 않습니다.</p>
+
+  <h2>6. 데이터 삭제</h2>
+  <p>
+    기기에 저장된 모든 정보(카카오 키, 퀴즈 기록)는 앱(또는 브라우저)의 데이터/캐시를 삭제하거나
+    앱을 제거하면 함께 삭제됩니다.
+  </p>
+
+  <h2>7. 방침 변경</h2>
+  <p>본 방침은 필요 시 개정될 수 있으며, 변경 시 본 페이지에 시행일과 함께 게시합니다.</p>
+
+  <h2>8. 문의</h2>
+  <p>개인정보 관련 문의: <b><a href="mailto:vegita89@daum.net">vegita89@daum.net</a></b></p>
+
+  <footer>© 2026 제우스의 점심 · 본 앱은 무료로 제공됩니다.</footer>
+</main>
+</body>
+</html>

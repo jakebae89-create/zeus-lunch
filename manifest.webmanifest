@@ -1,12 +1,16 @@
 {
+  "id": "/zeus-lunch/",
   "name": "제우스의 점심",
   "short_name": "제우스의 점심",
-  "description": "번개로 주변 식당을 골라주는 앱",
+  "description": "번개로 주변 식당을 골라주는 앱 (+ 레트로 상식 퀴즈)",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait",
+  "dir": "ltr",
   "lang": "ko",
+  "categories": ["food", "lifestyle", "games"],
   "background_color": "#05030f",
   "theme_color": "#1a1342",
   "icons": [

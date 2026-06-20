@@ -1,8 +1,10 @@
 /* 제우스의 점심 — 서비스워커 (오프라인 앱셸 캐시) */
-const CACHE = "zeus-lunch-v1";
+const CACHE = "zeus-lunch-v2";
 const SHELL = [
   "./",
   "./index.html",
+  "./quiz/index.html",
+  "./quiz/questions.js",
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png",
